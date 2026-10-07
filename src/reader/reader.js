@@ -124,10 +124,12 @@ const getCSS = ({
     }
 `, `
     ${whenScheme(forced, 'light', `
+        html, body {
+            background-color: ${theme.light.bg} !important;
+        }
         ${theme.light.bg !== '#ffffff' ? `
         html, body {
             color: ${theme.light.fg} !important;
-            background: none !important;
         }
         body * {
             color: inherit !important;
@@ -151,7 +153,7 @@ const getCSS = ({
         ${invert ? '' : `
         html, body {
             color: ${theme.dark.fg} !important;
-            background: none !important;
+            background-color: ${theme.dark.bg} !important;
         }
         body * {
             color: inherit !important;
@@ -304,6 +306,16 @@ class Reader {
         $style.setProperty('--light-fg', theme.light.fg)
         $style.setProperty('--dark-bg', theme.dark.bg)
         $style.setProperty('--dark-fg', theme.dark.fg)
+        // The page surface used to follow prefers-color-scheme, which WebKitGTK
+        // reports backwards. Paint it from the scheme the app is actually using.
+        if (style.dark === true || style.dark === false) {
+            const dark = style.dark === true
+            const palette = dark ? theme.dark : theme.light
+            $style.setProperty('--bg', palette.bg)
+            $style.setProperty('--fg', palette.fg)
+            document.documentElement.classList.toggle('scheme-dark', dark)
+            document.documentElement.style.colorScheme = dark ? 'dark' : 'light'
+        }
         const renderer = this.view?.renderer
         if (renderer) {
             renderer.setAttribute('flow', layout.flow)
