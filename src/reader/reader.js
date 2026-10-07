@@ -48,10 +48,23 @@ const getHTML = async range => {
     return new XMLSerializer().serializeToString(fragment)
 }
 
+
+// WebKitGTK reports prefers-color-scheme as the opposite of Adwaita's
+// color scheme. When the app passes the scheme it is actually using,
+// apply that palette directly.
+const whenScheme = (forced, scheme, body) => forced == null
+    ? `@media screen and (prefers-color-scheme: ${scheme}) {${body}}`
+    : forced === scheme ? body : ''
+const whenDark = (forced, body) => forced == null
+    ? `@media (prefers-color-scheme: dark) {${body}}`
+    : forced === 'dark' ? body : ''
+
 const getCSS = ({
     lineHeight, justify, hyphenate, invert, theme, overrideFont, userStylesheet,
-    mediaActiveClass,
-}) => [`
+    mediaActiveClass, dark,
+}) => {
+    const forced = dark === true ? 'dark' : dark === false ? 'light' : null
+    return [`
     @namespace epub "http://www.idpf.org/2007/ops";
     @media print {
         html {
@@ -62,7 +75,7 @@ const getCSS = ({
     }
     @media screen {
         html {
-            color-scheme: ${invert ? 'only light' : 'light dark'};
+            color-scheme: ${invert ? 'only light' : forced === 'dark' ? 'only dark' : forced === 'light' ? 'only light' : 'light dark'};
             color: ${theme.light.fg};
         }
         a:any-link {
@@ -75,7 +88,7 @@ const getCSS = ({
                 text-decoration-color: unset;
             }
         }
-        @media (prefers-color-scheme: dark) {
+        ${whenDark(forced, `
             html {
                 color: ${invert ? theme.inverted.fg : theme.dark.fg};
                 ${invert ? '-webkit-font-smoothing: antialiased;' : ''}
@@ -83,7 +96,7 @@ const getCSS = ({
             a:any-link {
                 color: ${invert ? theme.inverted.link : theme.dark.link};
             }
-        }
+        `)}
         aside[epub|type~="footnote"] {
             display: none;
         }
@@ -110,7 +123,7 @@ const getCSS = ({
         tab-size: 2;
     }
 `, `
-    @media screen and (prefers-color-scheme: light) {
+    ${whenScheme(forced, 'light', `
         ${theme.light.bg !== '#ffffff' ? `
         html, body {
             color: ${theme.light.fg} !important;
@@ -133,8 +146,8 @@ const getCSS = ({
             background: color-mix(in hsl, ${theme.light.fg}, #fff 50%) !important;
             background: color-mix(in hsl, ${theme.light.fg}, ${theme.light.bg} 85%) !important;
         }` : ''}
-    }
-    @media screen and (prefers-color-scheme: dark) {
+    `)}
+    ${whenScheme(forced, 'dark', `
         ${invert ? '' : `
         html, body {
             color: ${theme.dark.fg} !important;
@@ -153,7 +166,7 @@ const getCSS = ({
             background: color-mix(in hsl, ${theme.dark.fg}, #000 50%) !important;
             background: color-mix(in hsl, ${theme.dark.fg}, ${theme.dark.bg} 75%) !important;
         }`}
-    }
+    `)}
     p, li, blockquote, dd {
         line-height: ${lineHeight};
         text-align: ${justify ? 'justify' : 'start'};
@@ -161,6 +174,7 @@ const getCSS = ({
     }
     ${overrideFont ? '* { font-family: revert !important }' : ''}
 ` + userStylesheet]
+}
 
 const frameRect = (frame, rect, sx = 1, sy = 1) => {
     const left = sx * rect.left + frame.left
